@@ -8,7 +8,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      ENTEC_API_TOKEN: ${ENTEC_API_TOKEN:?Set ENTEC_API_TOKEN in .env}
       ENTEC_SNAPSHOT_DIR: /data/snapshots
       ENTEC_BACKUP_DIR: /data/backups
     volumes:
@@ -58,7 +57,6 @@ services:
       ENTEC_PROXY_USER: ${ENTEC_PROXY_USER:?Set ENTEC_PROXY_USER in .env}
       ENTEC_PROXY_PASSWORD_HASH: ${ENTEC_PROXY_PASSWORD_HASH:?Set ENTEC_PROXY_PASSWORD_HASH in .env}
       ENTEC_DASHBOARD_TOKEN: ${ENTEC_DASHBOARD_TOKEN:?Set ENTEC_DASHBOARD_TOKEN in .env}
-      ENTEC_API_TOKEN: ${ENTEC_API_TOKEN:?Set ENTEC_API_TOKEN in .env}
     ports:
       - "80:80"
       - "443:443"
