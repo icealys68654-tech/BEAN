@@ -24,7 +24,7 @@ export function parseWindowsIdsRecord(value: unknown, lineNumber: number): Windo
   }
 
   const record = value as Record<string, unknown>;
-  if (typeof record.path !== 'string' || !record.path.trim() || record.path.includes('\\0')) {
+  if (typeof record.path !== 'string' || !record.path.trim() || record.path.includes('\0')) {
     return fail('path must be a non-empty string without NUL');
   }
   if (typeof record.hash !== 'string' || !/^[a-f0-9]{64}$/i.test(record.hash)) {
