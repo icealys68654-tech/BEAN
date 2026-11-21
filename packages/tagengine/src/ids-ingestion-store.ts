@@ -57,6 +57,8 @@ export class IdsIngestionStore {
       CREATE INDEX IF NOT EXISTS idx_ids_events_scan ON ids_events(scan_id, id);
       CREATE INDEX IF NOT EXISTS idx_ids_events_path ON ids_events(path);
     `);
+    // A process crash may leave an INGESTING scan. Never expose it as complete.
+    this.db.prepare("DELETE FROM ids_scans WHERE status != 'COMPLETE'").run();
   }
 
   async ingest(input: {
@@ -69,6 +71,14 @@ export class IdsIngestionStore {
     if (!volumeId || volumeId.length > 128) throw new Error('volumeId must be 1-128 characters');
     if (!label || label.length > 200) throw new Error('label must be 1-200 characters');
 
+    const existing = this.db.prepare(`SELECT scan_id AS scanId, volume_id AS volumeId, label, status,
+      started_at AS startedAt, completed_at AS completedAt, record_count AS recordCount
+      FROM ids_scans WHERE scan_id = ?`).get(scanId) as IdsScanSummary | undefined;
+    if (existing) {
+      if (existing.volumeId !== volumeId) throw new Error('scanId is already associated with a different volume');
+      if (existing.status === 'COMPLETE') return existing;
+      throw new Error('scanId is already being ingested');
+    }
     const startedAt = new Date().toISOString();
     this.db.prepare('INSERT INTO ids_scans (scan_id, volume_id, label, status, started_at) VALUES (?, ?, ?, ?, ?)')
       .run(scanId, volumeId, label, 'INGESTING', startedAt);
