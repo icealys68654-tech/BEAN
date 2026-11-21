@@ -1,0 +1,30 @@
+name: Build GitHub-ready BEAN ZIP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - run: npm run build
+      - run: npm test
+      - name: Create source ZIP
+        run: zip -r BEAN-github-ready.zip . -x '.git/*' 'node_modules/*' '**/node_modules/*' '**/dist/*' '**/data/*'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BEAN-github-ready
+          path: BEAN-github-ready.zip
+          if-no-files-found: error
+          retention-days: 30
