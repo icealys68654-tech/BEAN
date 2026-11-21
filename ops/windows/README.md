@@ -8,7 +8,7 @@
    powershell -ExecutionPolicy Bypass -File .\ops\windows\Register-BeanTasks.ps1
 6. Confirm docker compose ps, https://<dashboard-domain>, and https://<api-domain>/api/health.
 
-The TagEngine and dashboard containers are private on the Docker network. Caddy is the only service publishing public ports. Caddy enforces HTTP Basic authentication at the edge; it injects separate server-side bearer tokens into the dashboard and TagEngine upstream requests. Do not expose container ports directly.
+The TagEngine and dashboard containers are private on the Docker network. Caddy is the only service publishing public ports. Caddy enforces HTTP Basic authentication for the dashboard and injects ENTEC_DASHBOARD_TOKEN on that private hop. The API hostname forwards the caller's ENTEC_API_TOKEN bearer header unchanged so TagEngine can authenticate the IDS uploader itself. Do not expose container ports directly.
 
 ## Windows IDS scheduled task integration
 
