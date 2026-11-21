@@ -85,7 +85,7 @@ export class IdsIngestionStore {
           hashKind: record.is_content_hashed ? 'CONTENT_SHA256' : 'METADATA_FINGERPRINT',
           entropyBits: record.entropy_bits, entropyNorm: record.entropy_norm,
           magicMismatch: record.magic_mismatch ? 1 : 0, magicInfo: record.magic_info,
-          recordJson: JSON.stringify(parsed)
+          recordJson: JSON.stringify(record)
         });
         recordCount += 1;
         if (batch.length >= 500) { flush(batch); batch.length = 0; }
