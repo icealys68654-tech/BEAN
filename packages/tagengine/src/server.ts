@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as readline from 'readline';
 import { timingSafeEqual } from 'crypto';
 import { SnapshotStore } from './snapshot-store';
+import { IdsIngestionStore } from './ids-ingestion-store';
 import {
   parseDirSnapshotToVectors,
   detectSnapshotAnchorEpoch,
@@ -22,6 +23,8 @@ const API_TOKEN = process.env.ENTEC_API_TOKEN || '';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const SNAPSHOT_DIR = path.resolve(process.env.ENTEC_SNAPSHOT_DIR || path.join(process.cwd(), 'data', 'snapshots'));
 const snapshotStore = new SnapshotStore(SNAPSHOT_DIR);
+const idsIngestionStore = new IdsIngestionStore(SNAPSHOT_DIR);
+const BACKUP_DIR = path.resolve(process.env.ENTEC_BACKUP_DIR || path.join(path.dirname(SNAPSHOT_DIR), 'backups'));
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -100,6 +103,60 @@ async function readJsonlRecords<T>(filePath: string, limit: number = 1000): Prom
 
 const server = http.createServer(async (req, res) => {
   const url = (req.url || '/').split('?')[0];
+
+  if (req.method === 'POST' && url === '/api/ids/ingest') {
+    if (IS_PRODUCTION && !API_TOKEN) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API authentication is not configured' }));
+      return;
+    }
+    if (!isAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="TagEngine API"', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: 'Bearer token required' }));
+      return;
+    }
+    try {
+      const volumeId = String(req.headers['x-volume-id'] || '');
+      const scanId = String(req.headers['x-scan-id'] || '');
+      const label = String(req.headers['x-scan-label'] || 'Windows IDS scan');
+      if (!volumeId.trim()) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'X-Volume-ID header is required' }));
+        return;
+      }
+      const lines = readline.createInterface({ input: req, crlfDelay: Infinity });
+      const scan = await idsIngestionStore.ingest({ lines, scanId: scanId || undefined, volumeId, label });
+      res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ scan }));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'IDS ingestion failed';
+      res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return;
+  }
+
+  if (req.method === 'GET' && url === '/api/ids/scans') {
+    if (IS_PRODUCTION && !API_TOKEN) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API authentication is not configured' }));
+      return;
+    }
+    if (!isAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="TagEngine API"', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: 'Bearer token required' }));
+      return;
+    }
+    const limit = Number(new URL(req.url || '/', 'http://localhost').searchParams.get('limit') || '100');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'limit must be an integer from 1 to 500' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ scans: idsIngestionStore.list(limit) }));
+    return;
+  }
 
   if (req.method === 'GET' && url === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -243,6 +300,34 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url === '/api/maintenance/backup' && req.method === 'POST') {
+    if (IS_PRODUCTION && !API_TOKEN) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'API authentication is not configured' }));
+      return;
+    }
+    if (!isAuthorized(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="TagEngine API"', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: 'Bearer token required' }));
+      return;
+    }
+    try {
+      fs.mkdirSync(BACKUP_DIR, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const destination = path.join(BACKUP_DIR, stamp);
+      fs.mkdirSync(destination, { recursive: false });
+      const snapshots = await snapshotStore.backupTo(destination);
+      const idsDatabase = await idsIngestionStore.backupTo(destination);
+      res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ backup: { directory: destination, snapshots, idsDatabase } }));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Backup failed';
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: message }));
+    }
+    return;
+  }
+
   if (url === '/api/maintenance/retention' && req.method === 'POST') {
     if (IS_PRODUCTION && !API_TOKEN) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
@@ -263,13 +348,24 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'retentionDays is required; keepLatestPerVolume must be an integer and dryRun must be boolean' }));
         return;
       }
+      const dryRun = body.dryRun !== false;
+      let backup: { directory: string; snapshots: unknown; idsDatabase: string } | undefined;
+      if (!dryRun) {
+        fs.mkdirSync(BACKUP_DIR, { recursive: true });
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const destination = path.join(BACKUP_DIR, stamp);
+        fs.mkdirSync(destination, { recursive: false });
+        const snapshots = await snapshotStore.backupTo(destination);
+        const idsDatabase = await idsIngestionStore.backupTo(destination);
+        backup = { directory: destination, snapshots, idsDatabase };
+      }
       const result = snapshotStore.applyRetention({
         retentionDays: body.retentionDays,
         keepLatestPerVolume: body.keepLatestPerVolume as number | undefined,
-        dryRun: body.dryRun as boolean | undefined,
+        dryRun,
       });
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      res.end(JSON.stringify({ retention: result, storageUsage: snapshotStore.storageUsage() }));
+      res.end(JSON.stringify({ retention: result, backup, storageUsage: snapshotStore.storageUsage() }));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Retention operation failed';
       res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
