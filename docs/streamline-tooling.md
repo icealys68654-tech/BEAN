@@ -13,10 +13,10 @@ The Streamline tooling is integrated as first-party packages inside BEAN; it doe
 ```sh
 npm install
 npm run build
-npm test
-go test ./packages/...
-go build -o ./dist/bin/smoke-probe ./packages/smoke-probe/cmd/smoke-probe
-go build -o ./dist/bin/env-guard ./packages/env-guard/cmd/env-guard
+npm test  # includes both Go CLI test suites
+mkdir -p dist/bin
+(cd packages/smoke-probe && go build -o ../../dist/bin/smoke-probe ./cmd/smoke-probe)
+(cd packages/env-guard && go build -o ../../dist/bin/env-guard ./cmd/env-guard)
 ```
 
 Smoke suite example (`ops/smoke/bean-health.json`):
