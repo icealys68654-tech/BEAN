@@ -29,7 +29,7 @@ func run(path string) int {
   data, err := os.ReadFile(path)
   if err != nil { fmt.Fprintln(os.Stderr, err); return 1 }
   var suite Suite
-  if err := json.Unmarshal(data, &suite); err != nil { fmt.Fprintf(os.Stderr, "suite must be JSON: %v\\n", err); return 1 }
+  if err := json.Unmarshal(data, &suite); err != nil { fmt.Fprintf(os.Stderr, "suite must be JSON: %v\n", err); return 1 }
   if len(suite.Checks) == 0 { fmt.Fprintln(os.Stderr, "suite has no checks"); return 1 }
   failures := 0
   for i, c := range suite.Checks {
@@ -37,21 +37,21 @@ func run(path string) int {
     method := c.Method; if method == "" { method = http.MethodGet }
     timeout := time.Duration(c.TimeoutMS) * time.Millisecond; if timeout <= 0 { timeout = 10 * time.Second }
     req, err := http.NewRequest(method, expand(c.URL), nil)
-    if err != nil { fmt.Printf("FAIL %s: %v\\n", name, err); failures++; continue }
+    if err != nil { fmt.Printf("FAIL %s: %v\n", name, err); failures++; continue }
     for k, v := range c.Headers { req.Header.Set(k, expand(v)) }
     client := &http.Client{Timeout: timeout}
     resp, err := client.Do(req)
-    if err != nil { fmt.Printf("FAIL %s: %v\\n", name, err); failures++; continue }
+    if err != nil { fmt.Printf("FAIL %s: %v\n", name, err); failures++; continue }
     body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20)); resp.Body.Close()
     expected := c.ExpectedStatus; if expected == 0 { expected = http.StatusOK }
-    if readErr != nil { fmt.Printf("FAIL %s: response read: %v\\n", name, readErr); failures++; continue }
-    if resp.StatusCode != expected { fmt.Printf("FAIL %s: status %d, expected %d\\n", name, resp.StatusCode, expected); failures++; continue }
+    if readErr != nil { fmt.Printf("FAIL %s: response read: %v\n", name, readErr); failures++; continue }
+    if resp.StatusCode != expected { fmt.Printf("FAIL %s: status %d, expected %d\n", name, resp.StatusCode, expected); failures++; continue }
     if c.ExpectedBodyContains != "" && !strings.Contains(string(body), c.ExpectedBodyContains) {
-      fmt.Printf("FAIL %s: response body did not contain expected text\\n", name); failures++; continue
+      fmt.Printf("FAIL %s: response body did not contain expected text\n", name); failures++; continue
     }
-    fmt.Printf("PASS %s (%d)\\n", name, resp.StatusCode)
+    fmt.Printf("PASS %s (%d)\n", name, resp.StatusCode)
   }
-  fmt.Printf("%d check(s), %d failure(s)\\n", len(suite.Checks), failures)
+  fmt.Printf("%d check(s), %d failure(s)\n", len(suite.Checks), failures)
   return failures
 }
 func main() {
