@@ -92,6 +92,10 @@ Keep the resulting hash in the local .env file. Never commit .env or tokens.
 
 Start with `docker compose up -d --build`. For Windows reboot startup and a daily backup task, run the elevated PowerShell script documented in ops/windows/README.md. The containers use restart: unless-stopped; configure the Docker Engine itself to start automatically at boot.
 
+## Windows IDS filesystem scanner
+
+The initial scanner implementation is at `ops/windows/ids/scanner.py`. It emits the canonical seven-field Windows IDS JSONL record, computes SHA-256 and Shannon entropy using 1 MiB file chunks, performs conservative file-signature checks, and supports SQLite baseline comparison/promotion. Findings and scan summaries are separate from the evidence stream. See `ops/windows/ids/README.md`. The Python scanner tests are included in `npm test`; CMake targets are available from the repository root.
+
 ## Windows IDS JSONL ingestion
 
 The authenticated streaming endpoint is `POST /api/ids/ingest`. It accepts the producer JSONL format as application/x-ndjson with Authorization: Bearer, X-Volume-ID, and optional X-Scan-ID / X-Scan-Label headers. The API validates each record, preserves the complete original JSON object, and stores events in ids-ingestion.sqlite without buffering the entire request in memory. Completed scan metadata is available from `GET /api/ids/scans`.
