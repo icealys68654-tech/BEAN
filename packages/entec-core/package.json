@@ -9,7 +9,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test dist/vector/parse.test.js dist/tagengine/client.test.js",
+    "test": "npm run build && node --test dist/vector/parse.test.js dist/tagengine/client.test.js dist/ids/windows-ids-jsonl.test.js",
     "dashboard": "node dist/operations/server.js"
   },
   "engines": {
