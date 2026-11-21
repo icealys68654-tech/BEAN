@@ -124,6 +124,7 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'X-Volume-ID header is required' }));
         return;
       }
+      req.setEncoding('utf8');
       const lines = readline.createInterface({ input: req, crlfDelay: Infinity });
       const scan = await idsIngestionStore.ingest({ lines, scanId: scanId || undefined, volumeId, label });
       res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
