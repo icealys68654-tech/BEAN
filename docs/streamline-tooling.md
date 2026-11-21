@@ -34,8 +34,8 @@ Smoke suite example (`ops/smoke/bean-health.json`):
 }
 ```
 
-Run with `go run ./packages/smoke-probe/cmd/smoke-probe run --suite ops/smoke/bean-health.json`.
+Run with `cd packages/smoke-probe && go run ./cmd/smoke-probe run --suite ../../ops/smoke/bean-health.json`.
 
-Run the environment guard with `go run ./packages/env-guard/cmd/env-guard --required ENTEC_API_TOKEN,TAGENGINE_URL .env`.
+Run the environment guard with `cd packages/env-guard && go run ./cmd/env-guard --required ENTEC_API_TOKEN,TAGENGINE_URL ../../.env`.
 
 The smoke-probe suite format is JSON (also valid YAML 1.2), deliberately avoiding a YAML parser dependency. It limits response reads to 1 MiB and never logs response bodies or header values.
