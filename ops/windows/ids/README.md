@@ -29,3 +29,9 @@ python ops/windows/ids_ingest.py --jsonl evidence\scan.jsonl
 - Signature checks are deliberately limited; high entropy is not a malware verdict.
 - NTFS alternate data streams and ACL/owner metadata are not yet collected.
 - Review findings before promoting a baseline.
+
+## Bounded-memory scan state
+
+Scan inventory, baseline comparisons, and findings are staged in SQLite. The scanner does not retain a Python list/set of every file or finding. File bytes are read in 1 MiB chunks; the entropy histogram is a fixed 256-counter structure. Evidence JSONL and findings JSONL are written incrementally. Staging rows are removed after a successfully completed scan; if a process is interrupted, its staging rows remain available for diagnosis and are not promoted automatically.
+
+Baseline replacement is performed in a SQLite transaction and only after the scan completes without collection errors. Use `--compare-baseline` to emit new/changed/removed findings. Use `--promote-baseline` only when the scan is trusted and reviewed. A promotion request with collection errors is rejected.
