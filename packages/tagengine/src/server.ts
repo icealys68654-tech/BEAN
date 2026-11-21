@@ -132,7 +132,8 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ scan }));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'IDS ingestion failed';
-      res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      const status = /already being ingested/i.test(message) ? 409 : 400;
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ error: message }));
     }
     return;
