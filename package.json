@@ -1,0 +1,19 @@
+{
+  "name": "bean-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BEAN full-stack monorepo integrating Entec orchestration and TagEngine snapshot analysis.",
+  "workspaces": [
+    "packages/entec-core",
+    "packages/tagengine"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @entec/umbrella && npm run build --workspace @bean/tagengine",
+    "test": "npm run test --workspace @entec/umbrella && npm run test --workspace @bean/tagengine",
+    "dashboard": "npm run dashboard --workspace @entec/umbrella",
+    "api": "npm run start --workspace @bean/tagengine"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@bean/tagengine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TagEngine 12D Windows snapshot parser, disk-backed SQLite diff engine, and HTTP API.",
+  "license": "GPL-3.0",
+  "type": "commonjs",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "cli": "ts-node src/cli.ts",
+    "test": "npm run build && node --test tests/*.test.cjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.9.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
