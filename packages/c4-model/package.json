@@ -1,0 +1,10 @@
+{
+  "name": "@bean/c4-model",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Validated C4 architecture model and PlantUML export for BEAN.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc -p tsconfig.json", "test": "npm run build && node --test dist/index.test.js" },
+  "devDependencies": { "@types/node": "^22.9.0", "typescript": "^5.6.3" }
+}
