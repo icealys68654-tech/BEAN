@@ -173,6 +173,44 @@ export class SnapshotStore {
     return { files, bytes };
   }
 
+  /** Create a consistent SQLite backup plus every file referenced by its metadata. */
+  async backupTo(destinationDir: string): Promise<{ database: string; files: number; bytes: number; manifest: string }> {
+    const destination = path.resolve(destinationDir);
+    if (destination === this.storageDir || destination.startsWith(this.storageDir + path.sep)) {
+      throw new Error('ENTEC_BACKUP_DIR must be outside ENTEC_SNAPSHOT_DIR');
+    }
+    fs.mkdirSync(destination, { recursive: true });
+    const database = path.join(destination, 'snapshots.sqlite');
+    await this.db.backup(database);
+    const snapshotRows = this.db.prepare('SELECT source_path AS sourcePath, vectors_path AS vectorsPath FROM snapshots').all() as Array<{ sourcePath: string; vectorsPath: string }>;
+    const comparisonRows = this.db.prepare('SELECT alerts_path AS alertsPath FROM snapshot_comparisons').all() as Array<{ alertsPath: string }>;
+    const sources = [...snapshotRows.flatMap(row => [row.sourcePath, row.vectorsPath]), ...comparisonRows.map(row => row.alertsPath)];
+    const artifactsDir = path.join(destination, 'artifacts');
+    fs.mkdirSync(artifactsDir, { recursive: true });
+    const entries: Array<{ relativePath: string; backupPath: string; bytes: number }> = [];
+    let bytes = fs.statSync(database).size;
+    for (const source of [...new Set(sources)]) {
+      const absolute = path.resolve(source);
+      if (!absolute.startsWith(this.storageDir + path.sep)) throw new Error('Refusing to back up an artifact outside ENTEC_SNAPSHOT_DIR');
+      if (!fs.existsSync(absolute)) throw new Error('Cannot back up missing snapshot artifact: ' + path.basename(absolute));
+      const relativePath = path.relative(this.storageDir, absolute);
+      const backupName = relativePath.split(path.sep).join('__');
+      const target = path.join(artifactsDir, backupName);
+      fs.copyFileSync(absolute, target);
+      const size = fs.statSync(target).size;
+      bytes += size;
+      entries.push({ relativePath, backupPath: path.relative(destination, target), bytes: size });
+    }
+    const manifest = path.join(destination, 'manifest.json');
+    fs.writeFileSync(manifest, JSON.stringify({
+      createdAt: new Date().toISOString(),
+      sourceDirectory: this.storageDir,
+      database: path.basename(database),
+      artifacts: entries
+    }, null, 2) + '\n', { encoding: 'utf8', flag: 'wx' });
+    return { database, files: entries.length + 1, bytes, manifest };
+  }
+
   applyRetention(input: { retentionDays: number; keepLatestPerVolume?: number; dryRun?: boolean }): {
     dryRun: boolean; cutoff: string; candidates: { snapshots: number; comparisons: number };
     deleted: { snapshots: number; comparisons: number }; bytesReclaimable: number;
