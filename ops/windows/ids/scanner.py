@@ -220,6 +220,11 @@ def scan(args: argparse.Namespace) -> int:
                     except OSError as exc:
                         errors += 1
                         state.stage_error(scan_id, str(file_path), f"{type(exc).__name__}: {exc}")
+                # Bound the SQLite transaction/journal size and retain recoverable staging
+                # checkpoints if the process is interrupted.
+                if count % 500 == 0:
+                    state.db.commit()
+        state.db.commit()
         if args.compare_baseline and errors == 0:
             state.add_removed_findings(scan_id)
         if args.promote_baseline:
