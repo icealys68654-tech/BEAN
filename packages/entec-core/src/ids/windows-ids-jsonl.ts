@@ -49,7 +49,7 @@ export function parseWindowsIdsRecord(
   if (typeof record.path !== "string" || !record.path.trim()) {
     return fail(lineNumber, "path must be a non-empty string");
   }
-  if (record.path.includes("\\0")) {
+  if (record.path.includes("\0")) {
     return fail(lineNumber, "path contains a null character");
   }
   if (typeof record.hash !== "string" || !/^[a-f0-9]{64}$/i.test(record.hash)) {
@@ -114,7 +114,7 @@ export function parseWindowsIdsJsonl(input: string): WindowsIdsEvidence[] {
   return output;
 }
 
-/** Streaming parser for large scans; accepts Node Readable streams and async line iterables. */
+/** Streaming parser for large scans; accepts an async iterable that yields complete lines. */
 export async function* parseWindowsIdsLines(
   lines: AsyncIterable<string>
 ): AsyncGenerator<WindowsIdsEvidence> {
