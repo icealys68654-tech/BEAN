@@ -66,3 +66,19 @@ test("backs up the IDS SQLite database", async () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a retried completed scan ID returns the original result without duplicate rows", async () => {
+  const dir = tempDir();
+  const store = new IdsIngestionStore(dir);
+  try {
+    const scanId = "c8d4d45a-5d31-4e43-86f1-8e22ab1d1b18";
+    const first = await store.ingest({ scanId, volumeId: "C:", lines: (async function* () { yield JSON.stringify(record); })() });
+    const retry = await store.ingest({ scanId, volumeId: "C:", lines: (async function* () { yield JSON.stringify(record); })() });
+    assert.equal(retry.scanId, first.scanId);
+    assert.equal(retry.recordCount, 1);
+    assert.equal(store.list(10).length, 1);
+  } finally {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
