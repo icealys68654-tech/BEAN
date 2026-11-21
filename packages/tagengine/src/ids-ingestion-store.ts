@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
+import { parseWindowsIdsJsonlLine } from './windows-ids-evidence';
 
 export interface IdsScanSummary {
   scanId: string;
@@ -11,26 +12,6 @@ export interface IdsScanSummary {
   startedAt: string;
   completedAt: string | null;
   recordCount: number;
-}
-
-type ProducerRecord = {
-  path: string; hash: string; is_content_hashed: boolean;
-  entropy_bits: number; entropy_norm: number;
-  magic_mismatch: boolean; magic_info: string;
-};
-
-function validateRecord(value: unknown, line: number): ProducerRecord {
-  const fail = (message: string): never => { throw new Error(`JSONL line ${line}: ${message}`); };
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return fail('expected a JSON object');
-  const r = value as Record<string, unknown>;
-  if (typeof r.path !== 'string' || !r.path.trim() || r.path.includes('\0')) return fail('path must be a non-empty string without NUL');
-  if (typeof r.hash !== 'string' || !/^[a-f0-9]{64}$/i.test(r.hash)) return fail('hash must be a 64-character SHA-256 digest');
-  if (typeof r.is_content_hashed !== 'boolean') return fail('is_content_hashed must be boolean');
-  if (typeof r.entropy_bits !== 'number' || !Number.isFinite(r.entropy_bits) || r.entropy_bits < 0 || r.entropy_bits > 8) return fail('entropy_bits must be between 0 and 8');
-  if (typeof r.entropy_norm !== 'number' || !Number.isFinite(r.entropy_norm) || r.entropy_norm < 0 || r.entropy_norm > 1) return fail('entropy_norm must be between 0 and 1');
-  if (typeof r.magic_mismatch !== 'boolean') return fail('magic_mismatch must be boolean');
-  if (typeof r.magic_info !== 'string') return fail('magic_info must be a string');
-  return r as ProducerRecord;
 }
 
 /** Durable, bounded-memory ingestion of the Windows IDS producer JSONL format. */
@@ -98,9 +79,7 @@ export class IdsIngestionStore {
         if (Buffer.byteLength(raw, 'utf8') > 1024 * 1024) throw new Error(`JSONL line ${lineNumber} exceeds 1 MiB`);
         if (!raw.trim()) continue;
         if (lineNumber > 2_000_000) throw new Error('Scan exceeds the 2,000,000-line safety limit');
-        let parsed: unknown;
-        try { parsed = JSON.parse(raw); } catch { throw new Error(`JSONL line ${lineNumber}: invalid JSON`); }
-        const record = validateRecord(parsed, lineNumber);
+        const record = parseWindowsIdsJsonlLine(raw, lineNumber);
         batch.push({
           scanId, path: record.path, hash: record.hash.toLowerCase(),
           hashKind: record.is_content_hashed ? 'CONTENT_SHA256' : 'METADATA_FINGERPRINT',
