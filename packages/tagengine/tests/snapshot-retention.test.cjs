@@ -58,3 +58,36 @@ test('retention protects old snapshots referenced by retained comparisons', asyn
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('backupTo creates a consistent database copy and manifest for tracked artifacts', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'entec-backup-test-'));
+  const backupRoot = dir + '-backup';
+  let store;
+  try {
+    store = new SnapshotStore(dir);
+    const created = await store.create({ snapshotText: snapshot('backup.txt', 42), volumeId: 'backup-volume' });
+    const result = await store.backupTo(backupRoot);
+    assert.equal(fs.existsSync(result.database), true);
+    assert.equal(fs.existsSync(result.manifest), true);
+    assert.ok(result.files >= 2);
+    const manifest = JSON.parse(fs.readFileSync(result.manifest, 'utf8'));
+    assert.ok(manifest.artifacts.some(item => item.relativePath === created.id + '.snapshot.txt'));
+    assert.ok(manifest.artifacts.some(item => item.relativePath === created.id + '.vectors.jsonl'));
+  } finally {
+    if (store) { try { store.close(); } catch {} }
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(backupRoot, { recursive: true, force: true });
+  }
+});
+
+test('backupTo refuses to write inside the live snapshot directory', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'entec-backup-path-test-'));
+  let store;
+  try {
+    store = new SnapshotStore(dir);
+    await assert.rejects(() => store.backupTo(path.join(dir, 'nested-backup')), /outside ENTEC_SNAPSHOT_DIR/);
+  } finally {
+    if (store) { try { store.close(); } catch {} }
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
