@@ -101,3 +101,13 @@ The Windows uploader is `ops/windows/ids_ingest.py`. It reads ENTEC_API_TOKEN an
 ## Backups before retention
 
 `POST /api/maintenance/backup` creates consistent SQLite backups and copies every tracked snapshot/vector/comparison artifact into ENTEC_BACKUP_DIR. The IDS evidence database is backed up as well. The API automatically creates a backup before every non-dry-run `POST /api/maintenance/retention`; if backup fails, destructive retention is not run. Backups include a manifest mapping original artifact paths to backup copies. Keep ENTEC_BACKUP_DIR outside ENTEC_SNAPSHOT_DIR and on durable storage.
+
+ 
+## Streamline engineering tools
+
+BEAN now hosts Streamline tooling as native packages rather than a separate placeholder repository:
+- `packages/c4-model` validates C4 architecture models and exports PlantUML.
+- `packages/env-guard` checks environment files for malformed assignments, duplicate keys, empty values, and required keys.
+- `packages/smoke-probe` executes bounded-response HTTP checks from JSON suites.
+
+See [docs/streamline-tooling.md](docs/streamline-tooling.md) for commands and a TagEngine health-check suite. Go CLI tests are included in `npm test` and the CI workflow.
