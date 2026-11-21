@@ -1,0 +1,27 @@
+{
+  email {$BEAN_TLS_EMAIL}
+}
+
+{$BEAN_DASHBOARD_DOMAIN} {
+  encode zstd gzip
+  basic_auth {
+    {$ENTEC_PROXY_USER} {$ENTEC_PROXY_PASSWORD_HASH}
+  }
+  reverse_proxy dashboard:4173 {
+    # The proxy authenticates the browser; this separate bearer credential
+    # authenticates the proxy-to-dashboard hop.
+    header_up Authorization "Bearer {$ENTEC_DASHBOARD_TOKEN}"
+    header_up X-Forwarded-Proto {scheme}
+  }
+}
+
+{$BEAN_API_DOMAIN} {
+  encode zstd gzip
+  basic_auth {
+    {$ENTEC_PROXY_USER} {$ENTEC_PROXY_PASSWORD_HASH}
+  }
+  reverse_proxy tagengine:3000 {
+    header_up Authorization "Bearer {$ENTEC_API_TOKEN}"
+    header_up X-Forwarded-Proto {scheme}
+  }
+}
