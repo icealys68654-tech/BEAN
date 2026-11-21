@@ -31,3 +31,7 @@ The daily task calls the authenticated backup endpoint. Every non-dry-run retent
 Restore requires stopping the TagEngine service, restoring the SQLite databases, and copying each manifest artifact back to its recorded relative path under ENTEC_SNAPSHOT_DIR. Test restores before relying on backups.
 
 The saved Windows IDS source currently available in this project history is truncated; use the complete scanner source from the host when wiring the final post-scan action. This uploader does not replace scanner functionality.
+
+### Docker engine account requirement
+
+The supplied Task Scheduler registration uses SYSTEM. This requires a machine-wide Docker Engine that the SYSTEM account can access and that starts as a Windows service. Docker Desktop is commonly scoped to an interactive user session; on such hosts, either run the startup/backup tasks under the Docker Desktop owner account or use a service-based Docker Engine deployment. Do not assume a SYSTEM task can control a per-user Docker Desktop daemon.
