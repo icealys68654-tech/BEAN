@@ -106,3 +106,16 @@ This is an operator-triggered maintenance operation, not a background scheduler.
 Run dry-runs regularly, execute only after reviewing results, and keep independent
 backups. Storage usage reports tracked snapshot and comparison artifacts, not SQLite
 database/WAL overhead or unrelated files in the directory.
+
+
+## Windows IDS JSONL ingestion
+
+The authenticated `POST /api/ids/ingest` endpoint accepts newline-delimited records emitted by the Windows IDS producer. Send the stream as `application/x-ndjson` with `Authorization: Bearer <ENTEC_API_TOKEN>`, `X-Volume-ID`, and optional UUID `X-Scan-ID` / `X-Scan-Label` headers. Each record must include the producer fields `path`, `hash`, `is_content_hashed`, `entropy_bits`, `entropy_norm`, `magic_mismatch`, and `magic_info`. Extra producer fields are preserved in the stored JSON evidence.
+
+The service validates each line and writes in bounded batches to `ids-ingestion.sqlite` inside `ENTEC_SNAPSHOT_DIR`. An incomplete or invalid scan is removed rather than exposed as complete. The endpoint returns scan metadata and record count. `GET /api/ids/scans?limit=100` lists completed and in-progress scan metadata (limit 1–500). This IDS evidence store is separate from the directory-manifest snapshot/vector store.
+
+## SQLite backups and destructive retention guard
+
+The authenticated `POST /api/maintenance/backup` endpoint uses SQLite's online backup API for both `snapshots.sqlite` and `ids-ingestion.sqlite`, then copies all snapshot source, vector, and comparison-alert files referenced by the snapshot database. A manifest records each original relative path and its backup copy. Configure `ENTEC_BACKUP_DIR) outside `ENTEC_SNAPSHOT_DIR`.
+
+Every non-dry-run `POST /api/maintenance/retention` performs the same backup first. If the backup fails, retention cleanup is not executed. Dry-run requests do not create backups. Keep the backup directory on durable storage and test restore procedures regularly.
