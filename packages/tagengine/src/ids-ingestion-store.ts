@@ -113,6 +113,13 @@ export class IdsIngestionStore {
     }
   }
 
+  async backupTo(destinationDir: string): Promise<string> {
+    fs.mkdirSync(destinationDir, { recursive: true });
+    const target = path.join(destinationDir, 'ids-ingestion.sqlite');
+    await this.db.backup(target);
+    return target;
+  }
+
   list(limit = 100): IdsScanSummary[] {
     const safeLimit = Math.max(1, Math.min(Math.floor(limit), 500));
     return this.db.prepare(`SELECT scan_id AS scanId, volume_id AS volumeId, label, status,
