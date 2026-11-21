@@ -1,0 +1,83 @@
+services:
+  tagengine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bean-platform:local
+    command: ["node", "packages/tagengine/dist/server.js"]
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      ENTEC_API_TOKEN: ${ENTEC_API_TOKEN:?Set ENTEC_API_TOKEN in .env}
+      ENTEC_SNAPSHOT_DIR: /data/snapshots
+      ENTEC_BACKUP_DIR: /data/backups
+    volumes:
+      - ./data/snapshots:/data/snapshots
+      - ./backups:/data/backups
+    expose:
+      - "3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [bean-internal]
+
+  dashboard:
+    image: bean-platform:local
+    command: ["node", "packages/entec-core/dist/operations/server.js"]
+    environment:
+      NODE_ENV: production
+      ENTEC_DASHBOARD_HOST: 0.0.0.0
+      ENTEC_DASHBOARD_PORT: "4173"
+      ENTEC_DASHBOARD_TOKEN: ${ENTEC_DASHBOARD_TOKEN:?Set ENTEC_DASHBOARD_TOKEN in .env}
+      TAGENGINE_URL: http://tagengine:3000
+      TAGENGINE_API_TOKEN: ${ENTEC_API_TOKEN:?Set ENTEC_API_TOKEN in .env}
+    depends_on:
+      tagengine:
+        condition: service_healthy
+    expose:
+      - "4173"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks: [bean-internal]
+
+  proxy:
+    image: caddy:2
+    environment:
+      BEAN_DASHBOARD_DOMAIN: ${BEAN_DASHBOARD_DOMAIN:?Set BEAN_DASHBOARD_DOMAIN in .env}
+      BEAN_API_DOMAIN: ${BEAN_API_DOMAIN:?Set BEAN_API_DOMAIN in .env}
+      ENTEC_PROXY_USER: ${ENTEC_PROXY_USER:?Set ENTEC_PROXY_USER in .env}
+      ENTEC_PROXY_PASSWORD_HASH: ${ENTEC_PROXY_PASSWORD_HASH:?Set ENTEC_PROXY_PASSWORD_HASH in .env}
+      ENTEC_DASHBOARD_TOKEN: ${ENTEC_DASHBOARD_TOKEN:?Set ENTEC_DASHBOARD_TOKEN in .env}
+      ENTEC_API_TOKEN: ${ENTEC_API_TOKEN:?Set ENTEC_API_TOKEN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - bean-caddy-data:/data
+      - bean-caddy-config:/config
+    depends_on:
+      dashboard:
+        condition: service_healthy
+      tagengine:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [bean-internal]
+
+networks:
+  bean-internal:
+    driver: bridge
+
+volumes:
+  bean-caddy-data:
+  bean-caddy-config:
