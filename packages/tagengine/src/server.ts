@@ -308,7 +308,6 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'A backup or retention operation is already in progress' }));
       return;
     }
-    maintenanceInProgress = true;
     if (IS_PRODUCTION && !API_TOKEN) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'API authentication is not configured' }));
@@ -319,6 +318,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'Bearer token required' }));
       return;
     }
+    maintenanceInProgress = true;
     try {
       fs.mkdirSync(BACKUP_DIR, { recursive: true });
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -344,7 +344,6 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'A backup or retention operation is already in progress' }));
       return;
     }
-    maintenanceInProgress = true;
     if (IS_PRODUCTION && !API_TOKEN) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'API authentication is not configured' }));
@@ -355,6 +354,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'Bearer token required' }));
       return;
     }
+    maintenanceInProgress = true;
     try {
       const body = await readJsonBody(req);
       if (typeof body.retentionDays !== 'number' || !Number.isInteger(body.retentionDays) ||
