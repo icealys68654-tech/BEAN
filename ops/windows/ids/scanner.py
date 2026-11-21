@@ -127,19 +127,20 @@ class ScanState:
         self.db.execute("INSERT INTO scan_findings(scan_id,payload) VALUES(?,?)",
                         (scan_id, json.dumps(finding, ensure_ascii=False, separators=(",", ":"))))
 
-    def stage_file(self, scan_id: str, record: dict, size: int, mtime_ns: int) -> None:
+    def stage_file(self, scan_id: str, record: dict, size: int, mtime_ns: int, compare_baseline: bool) -> None:
         self.db.execute(
             "INSERT OR REPLACE INTO scan_files(scan_id,path,sha256,size,mtime_ns) VALUES(?,?,?,?,?)",
             (scan_id, record["path"], record["hash"], size, mtime_ns))
-        old = self.db.execute("SELECT sha256 FROM files WHERE path=?", (record["path"],)).fetchone()
-        if old is None:
-            kind = "NEW_FILE"
-        elif old[0] != record["hash"]:
-            kind = "CONTENT_CHANGED"
-        else:
-            return
-        self.add_finding(scan_id, {"type": kind, "path": record["path"],
-                                   "sha256": record["hash"], "timestamp": utc_now()})
+        if compare_baseline:
+            old = self.db.execute("SELECT sha256 FROM files WHERE path=?", (record["path"],)).fetchone()
+            if old is None:
+                kind = "NEW_FILE"
+            elif old[0] != record["hash"]:
+                kind = "CONTENT_CHANGED"
+            else:
+                return
+            self.add_finding(scan_id, {"type": kind, "path": record["path"],
+                                       "sha256": record["hash"], "timestamp": utc_now()})
 
     def stage_error(self, scan_id: str, path: str, detail: str) -> None:
         self.add_finding(scan_id, {"type": "SCAN_ERROR", "path": path,
@@ -215,7 +216,7 @@ def scan(args: argparse.Namespace) -> int:
                 if record["is_content_hashed"]:
                     try:
                         st = file_path.stat(follow_symlinks=False)
-                        state.stage_file(scan_id, record, st.st_size, st.st_mtime_ns)
+                        state.stage_file(scan_id, record, st.st_size, st.st_mtime_ns, args.compare_baseline)
                     except OSError as exc:
                         errors += 1
                         state.stage_error(scan_id, str(file_path), f"{type(exc).__name__}: {exc}")
