@@ -98,7 +98,7 @@ test("canonical Windows IDS parser rejects malformed and out-of-contract fields"
   assert.throws(() => parseWindowsIdsRecord({ ...record, hash: "abc" }, 3), /64-character SHA-256/);
   assert.throws(() => parseWindowsIdsRecord({ ...record, entropy_bits: 8.01 }, 4), /entropy_bits/);
   assert.throws(() => parseWindowsIdsRecord({ ...record, entropy_norm: -0.01 }, 5), /entropy_norm/);
-  assert.throws(() => parseWindowsIdsRecord({ ...record, path: "C:/bad\\0name" }, 6), /without NUL/);
+  assert.throws(() => parseWindowsIdsRecord({ ...record, path: "C:/bad\0name" }, 6), /without NUL/);
   assert.throws(() => parseWindowsIdsRecord({ ...record, magic_mismatch: "false" }, 7), /magic_mismatch/);
 });
 
