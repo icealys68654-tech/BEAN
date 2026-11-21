@@ -78,7 +78,7 @@ Upstream source files and tests are retained under the corresponding package fol
 
 ## Production deployment (Windows / Docker Compose)
 
-The production deployment files are at the repository root: Dockerfile, docker-compose.yml, and deploy/Caddyfile. TagEngine and the Entec dashboard run as restartable containers on a private network. Caddy terminates HTTPS, applies HTTP Basic authentication at the edge, and injects the server-side bearer tokens required by each upstream. Only Caddy publishes ports 80/443.
+The production deployment files are at the repository root: Dockerfile, docker-compose.yml, and deploy/Caddyfile. TagEngine and the Entec dashboard run as restartable containers on a private network. Caddy terminates HTTPS and applies HTTP Basic authentication to the dashboard. It injects ENTEC_DASHBOARD_TOKEN on the private dashboard hop. The API route forwards the caller's ENTEC_API_TOKEN bearer header to TagEngine for validation. Only Caddy publishes ports 80/443.
 
 Copy .env.example to .env and set:
 - ENTEC_API_TOKEN: high-entropy TagEngine API secret.
