@@ -1,13 +1,17 @@
+import sys
 import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scanner import entropy_from_counts, file_evidence
 
 class ScannerTests(unittest.TestCase):
     def test_entropy(self):
         self.assertEqual(entropy_from_counts(Counter(), 0), 0.0)
         self.assertEqual(entropy_from_counts(Counter({65: 20}), 20), 0.0)
+
     def test_evidence_contract(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "hello.txt"
@@ -19,6 +23,7 @@ class ScannerTests(unittest.TestCase):
             self.assertEqual(set(record), {"path","hash","is_content_hashed","entropy_bits","entropy_norm","magic_mismatch","magic_info"})
             self.assertGreaterEqual(record["entropy_bits"], 0)
             self.assertLessEqual(record["entropy_norm"], 1)
+
     def test_signature_mismatch(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "fake.exe"
@@ -26,4 +31,6 @@ class ScannerTests(unittest.TestCase):
             record, error = file_evidence(path)
             self.assertIsNone(error)
             self.assertTrue(record["magic_mismatch"])
-if __name__ == "__main__": unittest.main()
+
+if __name__ == "__main__":
+    unittest.main()
