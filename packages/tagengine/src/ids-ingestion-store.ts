@@ -76,8 +76,8 @@ export class IdsIngestionStore {
     const insert = this.db.prepare(`INSERT INTO ids_events
       (scan_id, path, hash, hash_kind, entropy_bits, entropy_norm, magic_mismatch, magic_info, record_json)
       VALUES (@scanId, @path, @hash, @hashKind, @entropyBits, @entropyNorm, @magicMismatch, @magicInfo, @recordJson)`);
-    const batch: Array<Record<string, unknown>> = [];
-    const flush = this.db.transaction((rows: Array<Record<string, unknown>>) => {
+    const batch: any[] = [];
+    const flush = this.db.transaction((rows: any[]) => {
       for (const row of rows) insert.run(row);
     });
     let lineNumber = 0;
