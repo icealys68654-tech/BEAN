@@ -8,6 +8,7 @@ export function validate(model: C4Model): string[] {
   const ids = new Set<string>();
   for (const [i, element] of (model.elements ?? []).entries()) {
     if (!element.id?.trim()) errors.push(`elements[${i}].id is required`);
+    else if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(element.id)) errors.push(`elements[${i}].id must be a safe PlantUML alias`);
     else if (ids.has(element.id)) errors.push(`duplicate element id: ${element.id}`);
     else ids.add(element.id);
     if (!element.name?.trim()) errors.push(`elements[${i}].name is required`);
@@ -28,7 +29,7 @@ export function toPlantUML(model: C4Model): string {
   const lines = ["@startuml", "!include <C4/C4_Container>", "LAYOUT_WITH_LEGEND"];
   for (const e of model.elements) {
     const fn = ({ Person: "Person", System: "System", Container: "Container", Component: "Component" } as const)[e.type];
-    const args = [e.id, `"${quote(e.name)}"`, `"${quote(e.technology ?? "")}"`, `"${quote(e.description ?? "")}"`];
+    const args = [e.id, `"${quote(e.name)}"`, `"${quote(e.description ?? "")}"`];
     lines.push(`${fn}(${args.join(", ")})`);
   }
   for (const r of model.relationships) lines.push(`Rel(${r.source}, ${r.target}, "${quote(r.description)}", "${quote(r.technology ?? "")}")`);
