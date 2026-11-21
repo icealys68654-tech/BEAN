@@ -24,7 +24,7 @@ export function validate(model: C4Model): string[] {
 const quote = (value: string): string => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, " ");
 export function toPlantUML(model: C4Model): string {
   const errors = validate(model);
-  if (errors.length) throw new Error(`Invalid C4 model:\\n- ${errors.join("\\n- ")}`);
+  if (errors.length) throw new Error(`Invalid C4 model:\n- ${errors.join("\n- ")}`);
   const lines = ["@startuml", "!include <C4/C4_Container>", "LAYOUT_WITH_LEGEND"];
   for (const e of model.elements) {
     const fn = ({ Person: "Person", System: "System", Container: "Container", Component: "Component" } as const)[e.type];
@@ -33,5 +33,5 @@ export function toPlantUML(model: C4Model): string {
   }
   for (const r of model.relationships) lines.push(`Rel(${r.source}, ${r.target}, "${quote(r.description)}", "${quote(r.technology ?? "")}")`);
   lines.push("@enduml");
-  return lines.join("\\n");
+  return lines.join("\n");
 }
