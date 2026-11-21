@@ -17,6 +17,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
       - run: npm install
       - run: npm run build
       - run: npm test
+      - name: Build Go command-line tools
+        run: |
+          mkdir -p dist/bin
+          cd packages/env-guard && go build -o ../../dist/bin/env-guard ./cmd/env-guard
+          cd ../smoke-probe && go build -o ../../dist/bin/smoke-probe ./cmd/smoke-probe
