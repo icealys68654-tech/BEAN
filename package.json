@@ -10,11 +10,12 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present && npm run test:go",
+    "test": "npm run test --workspaces --if-present && npm run test:go && npm run test:python",
     "test:go": "cd packages/env-guard && go test ./... && cd ../smoke-probe && go test ./...",
     "dashboard": "npm run dashboard --workspace @entec/umbrella",
     "api": "npm run start --workspace @bean/tagengine",
-    "ci": "npm run build && npm test"
+    "ci": "npm run build && npm test",
+    "test:python": "python -m unittest discover -s ops/windows/ids/tests -v"
   },
   "engines": {
     "node": ">=20"
