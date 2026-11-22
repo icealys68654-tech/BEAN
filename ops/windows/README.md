@@ -10,6 +10,24 @@
 
 The TagEngine and dashboard containers are private on the Docker network. Caddy is the only service publishing public ports. Caddy enforces HTTP Basic authentication for the dashboard and injects ENTEC_DASHBOARD_TOKEN on that private hop. The API hostname forwards the caller's ENTEC_API_TOKEN bearer header unchanged so TagEngine can authenticate the IDS uploader itself. Do not expose container ports directly.
 
+## Deployment preflight
+
+Before starting containers or registering scheduled tasks, run the read-only deployment checks from an elevated PowerShell session:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\ops\windows\Test-BeanDeployment.ps1
+```
+
+The preflight checks required deployment files, required `.env` keys, token length and separation, placeholder/example hostnames, Caddy bcrypt hash shape, writable snapshot/backup directories, Docker Engine access for the current account, Compose configuration validity, and the presence/principal of the two BEAN scheduled tasks. It does not print secret values, start containers, register tasks, or change service configuration. Directory write checks create and immediately remove a temporary probe file.
+
+Use `-SkipDocker` when validating configuration before Docker is installed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\ops\windows\Test-BeanDeployment.ps1 -SkipDocker
+```
+
+A passing result is not proof that a SYSTEM scheduled task can access a per-user Docker Desktop daemon, that DNS/TLS is working, or that remote ingestion and restore work. Treat SYSTEM/Docker warnings as an explicit host-rehearsal item. Run the script again after registering tasks to confirm their configured principals.
+
 ## Windows IDS scheduled task integration
 
 The scanner must first write its completed JSONL output to a durable local path. Add this uploader as the final action in the existing SYSTEM scheduled task (or call it from the scanner's post-scan hook):
