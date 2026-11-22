@@ -12,13 +12,13 @@ The TagEngine and dashboard containers are private on the Docker network. Caddy 
 
 ## Deployment preflight
 
-Before starting containers or registering scheduled tasks, run the read-only deployment checks from an elevated PowerShell session:
+Before starting containers or registering scheduled tasks, run the non-deploying preflight checks from an elevated PowerShell session:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\ops\windows\Test-BeanDeployment.ps1
 ```
 
-The preflight checks required deployment files, required `.env` keys, token length and separation, placeholder/example hostnames, Caddy bcrypt hash shape, writable snapshot/backup directories, Docker Engine access for the current account, Compose configuration validity, and the presence/principal of the two BEAN scheduled tasks. It does not print secret values, start containers, register tasks, or change service configuration. Directory write checks create and immediately remove a temporary probe file.
+The preflight checks required deployment files, required `.env` keys, token length and separation, placeholder/example hostnames, Caddy bcrypt hash shape, writable snapshot/backup directories, Docker Engine access for the current account, Compose configuration validity, and the presence/principal of the two BEAN scheduled tasks. It does not print secret values, start containers, register tasks, or change service configuration. It may create the snapshot/backup directories if missing, then creates and immediately removes a temporary write-test file.
 
 Use `-SkipDocker` when validating configuration before Docker is installed:
 
