@@ -5,13 +5,17 @@
   "description": "BEAN full-stack monorepo integrating Entec orchestration and TagEngine snapshot analysis.",
   "workspaces": [
     "packages/entec-core",
-    "packages/tagengine"
+    "packages/tagengine",
+    "packages/c4-model"
   ],
   "scripts": {
-    "build": "npm run build --workspace @entec/umbrella && npm run build --workspace @bean/tagengine",
-    "test": "npm run test --workspace @entec/umbrella && npm run test --workspace @bean/tagengine",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:go && npm run test:python",
+    "test:go": "cd packages/env-guard && go test ./... && cd ../smoke-probe && go test ./...",
     "dashboard": "npm run dashboard --workspace @entec/umbrella",
-    "api": "npm run start --workspace @bean/tagengine"
+    "api": "npm run start --workspace @bean/tagengine",
+    "ci": "npm run build && npm test",
+    "test:python": "python -m unittest discover -s ops/windows/ids/tests -v"
   },
   "engines": {
     "node": ">=20"

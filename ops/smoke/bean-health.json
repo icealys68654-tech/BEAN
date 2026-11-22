@@ -1,0 +1,10 @@
+{
+  "checks": [
+    {
+      "name": "TagEngine health",
+      "url": "${TAGENGINE_URL}/api/health",
+      "expected_status": 200,
+      "timeout_ms": 5000
+    }
+  ]
+}

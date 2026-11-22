@@ -100,7 +100,7 @@ def main() -> int:
                     return 1
                 print(json.dumps(result, indent=2))
                 return 0
-            if status < 500:
+            if status < 500 and status != 409:
                 print(f"TagEngine rejected the scan (HTTP {status}): {body}", file=sys.stderr)
                 return 1
             last_error = f"HTTP {status}: {body}"

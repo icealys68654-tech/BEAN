@@ -51,7 +51,7 @@ The platform is passive. It reports changes and heuristic severity scores for op
 
 ## Production operations
 
-The Compose deployment runs TagEngine and the Entec dashboard as separate restartable services on a private Docker network. Caddy is the only published service and terminates TLS for both the dashboard and API domains. Edge HTTP Basic authentication is enforced by Caddy; Caddy replaces the upstream Authorization header with the relevant server-side bearer token. Do not publish TagEngine or dashboard ports directly.
+The Compose deployment runs TagEngine and the Entec dashboard as separate restartable services on a private Docker network. Caddy is the only published service and terminates TLS for both the dashboard and API domains. Edge HTTP Basic authentication protects the dashboard route; Caddy injects ENTEC_DASHBOARD_TOKEN only on the private dashboard hop. The API route forwards the caller's ENTEC_API_TOKEN bearer header unchanged for TagEngine to validate. Do not publish TagEngine or dashboard ports directly.
 
 ## IDS ingestion path
 

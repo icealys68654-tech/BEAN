@@ -78,7 +78,7 @@ Upstream source files and tests are retained under the corresponding package fol
 
 ## Production deployment (Windows / Docker Compose)
 
-The production deployment files are at the repository root: Dockerfile, docker-compose.yml, and deploy/Caddyfile. TagEngine and the Entec dashboard run as restartable containers on a private network. Caddy terminates HTTPS, applies HTTP Basic authentication at the edge, and injects the server-side bearer tokens required by each upstream. Only Caddy publishes ports 80/443.
+The production deployment files are at the repository root: Dockerfile, docker-compose.yml, and deploy/Caddyfile. TagEngine and the Entec dashboard run as restartable containers on a private network. Caddy terminates HTTPS and applies HTTP Basic authentication to the dashboard. It injects ENTEC_DASHBOARD_TOKEN on the private dashboard hop. The API route forwards the caller's ENTEC_API_TOKEN bearer header to TagEngine for validation. Only Caddy publishes ports 80/443.
 
 Copy .env.example to .env and set:
 - ENTEC_API_TOKEN: high-entropy TagEngine API secret.
@@ -92,6 +92,10 @@ Keep the resulting hash in the local .env file. Never commit .env or tokens.
 
 Start with `docker compose up -d --build`. For Windows reboot startup and a daily backup task, run the elevated PowerShell script documented in ops/windows/README.md. The containers use restart: unless-stopped; configure the Docker Engine itself to start automatically at boot.
 
+## Windows IDS filesystem scanner
+
+The initial scanner implementation is at `ops/windows/ids/scanner.py`. It emits the canonical seven-field Windows IDS JSONL record, computes SHA-256 and Shannon entropy using 1 MiB file chunks, performs conservative file-signature checks, and supports SQLite baseline comparison/promotion. Findings and scan summaries are separate from the evidence stream. See `ops/windows/ids/README.md`. The Python scanner tests are included in `npm test`; CMake targets are available from the repository root.
+
 ## Windows IDS JSONL ingestion
 
 The authenticated streaming endpoint is `POST /api/ids/ingest`. It accepts the producer JSONL format as application/x-ndjson with Authorization: Bearer, X-Volume-ID, and optional X-Scan-ID / X-Scan-Label headers. The API validates each record, preserves the complete original JSON object, and stores events in ids-ingestion.sqlite without buffering the entire request in memory. Completed scan metadata is available from `GET /api/ids/scans`.
@@ -101,3 +105,13 @@ The Windows uploader is `ops/windows/ids_ingest.py`. It reads ENTEC_API_TOKEN an
 ## Backups before retention
 
 `POST /api/maintenance/backup` creates consistent SQLite backups and copies every tracked snapshot/vector/comparison artifact into ENTEC_BACKUP_DIR. The IDS evidence database is backed up as well. The API automatically creates a backup before every non-dry-run `POST /api/maintenance/retention`; if backup fails, destructive retention is not run. Backups include a manifest mapping original artifact paths to backup copies. Keep ENTEC_BACKUP_DIR outside ENTEC_SNAPSHOT_DIR and on durable storage.
+
+ 
+## Streamline engineering tools
+
+BEAN now hosts Streamline tooling as native packages rather than a separate placeholder repository:
+- `packages/c4-model` validates C4 architecture models and exports PlantUML.
+- `packages/env-guard` checks environment files for malformed assignments, duplicate keys, empty values, and required keys.
+- `packages/smoke-probe` executes bounded-response HTTP checks from JSON suites.
+
+See [docs/streamline-tooling.md](docs/streamline-tooling.md) for commands and a TagEngine health-check suite. Go CLI tests are included in `npm test` and the CI workflow.

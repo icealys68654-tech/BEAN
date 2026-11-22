@@ -25,6 +25,7 @@ const SNAPSHOT_DIR = path.resolve(process.env.ENTEC_SNAPSHOT_DIR || path.join(pr
 const snapshotStore = new SnapshotStore(SNAPSHOT_DIR);
 const idsIngestionStore = new IdsIngestionStore(SNAPSHOT_DIR);
 const BACKUP_DIR = path.resolve(process.env.ENTEC_BACKUP_DIR || path.join(path.dirname(SNAPSHOT_DIR), 'backups'));
+let maintenanceInProgress = false;
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -131,7 +132,8 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ scan }));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'IDS ingestion failed';
-      res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      const status = /already being ingested/i.test(message) ? 409 : 400;
+      res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ error: message }));
     }
     return;
@@ -302,6 +304,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url === '/api/maintenance/backup' && req.method === 'POST') {
+    if (maintenanceInProgress) {
+      res.writeHead(409, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: 'A backup or retention operation is already in progress' }));
+      return;
+    }
     if (IS_PRODUCTION && !API_TOKEN) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'API authentication is not configured' }));
@@ -312,6 +319,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'Bearer token required' }));
       return;
     }
+    maintenanceInProgress = true;
     try {
       fs.mkdirSync(BACKUP_DIR, { recursive: true });
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -325,11 +333,18 @@ const server = http.createServer(async (req, res) => {
       const message = err instanceof Error ? err.message : 'Backup failed';
       res.writeHead(500, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ error: message }));
+    } finally {
+      maintenanceInProgress = false;
     }
     return;
   }
 
   if (url === '/api/maintenance/retention' && req.method === 'POST') {
+    if (maintenanceInProgress) {
+      res.writeHead(409, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ error: 'A backup or retention operation is already in progress' }));
+      return;
+    }
     if (IS_PRODUCTION && !API_TOKEN) {
       res.writeHead(503, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'API authentication is not configured' }));
@@ -340,6 +355,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'Bearer token required' }));
       return;
     }
+    maintenanceInProgress = true;
     try {
       const body = await readJsonBody(req);
       if (typeof body.retentionDays !== 'number' || !Number.isInteger(body.retentionDays) ||
@@ -371,6 +387,8 @@ const server = http.createServer(async (req, res) => {
       const message = err instanceof Error ? err.message : 'Retention operation failed';
       res.writeHead(400, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ error: message }));
+    } finally {
+      maintenanceInProgress = false;
     }
     return;
   }

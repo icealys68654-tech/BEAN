@@ -8,7 +8,25 @@
    powershell -ExecutionPolicy Bypass -File .\ops\windows\Register-BeanTasks.ps1
 6. Confirm docker compose ps, https://<dashboard-domain>, and https://<api-domain>/api/health.
 
-The TagEngine and dashboard containers are private on the Docker network. Caddy is the only service publishing public ports. Caddy enforces HTTP Basic authentication at the edge; it injects separate server-side bearer tokens into the dashboard and TagEngine upstream requests. Do not expose container ports directly.
+The TagEngine and dashboard containers are private on the Docker network. Caddy is the only service publishing public ports. Caddy enforces HTTP Basic authentication for the dashboard and injects ENTEC_DASHBOARD_TOKEN on that private hop. The API hostname forwards the caller's ENTEC_API_TOKEN bearer header unchanged so TagEngine can authenticate the IDS uploader itself. Do not expose container ports directly.
+
+## Deployment preflight
+
+Before starting containers or registering scheduled tasks, run the non-deploying preflight checks from an elevated PowerShell session:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\ops\windows\Test-BeanDeployment.ps1
+```
+
+The preflight checks required deployment files, required `.env` keys, token length and separation, placeholder/example hostnames, Caddy bcrypt hash shape, writable snapshot/backup directories, Docker Engine access for the current account, Compose configuration validity, and the presence/principal of the two BEAN scheduled tasks. It does not print secret values, start containers, register tasks, or change service configuration. It may create the snapshot/backup directories if missing, then creates and immediately removes a temporary write-test file.
+
+Use `-SkipDocker` when validating configuration before Docker is installed:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\ops\windows\Test-BeanDeployment.ps1 -SkipDocker
+```
+
+A passing result is not proof that a SYSTEM scheduled task can access a per-user Docker Desktop daemon, that DNS/TLS is working, or that remote ingestion and restore work. Treat SYSTEM/Docker warnings as an explicit host-rehearsal item. Run the script again after registering tasks to confirm their configured principals.
 
 ## Windows IDS scheduled task integration
 
@@ -31,3 +49,7 @@ The daily task calls the authenticated backup endpoint. Every non-dry-run retent
 Restore requires stopping the TagEngine service, restoring the SQLite databases, and copying each manifest artifact back to its recorded relative path under ENTEC_SNAPSHOT_DIR. Test restores before relying on backups.
 
 The saved Windows IDS source currently available in this project history is truncated; use the complete scanner source from the host when wiring the final post-scan action. This uploader does not replace scanner functionality.
+
+### Docker engine account requirement
+
+The supplied Task Scheduler registration uses SYSTEM. This requires a machine-wide Docker Engine that the SYSTEM account can access and that starts as a Windows service. Docker Desktop is commonly scoped to an interactive user session; on such hosts, either run the startup/backup tasks under the Docker Desktop owner account or use a service-based Docker Engine deployment. Do not assume a SYSTEM task can control a per-user Docker Desktop daemon.

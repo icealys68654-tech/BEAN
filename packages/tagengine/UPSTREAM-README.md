@@ -116,6 +116,6 @@ The service validates each line and writes in bounded batches to `ids-ingestion.
 
 ## SQLite backups and destructive retention guard
 
-The authenticated `POST /api/maintenance/backup` endpoint uses SQLite's online backup API for both `snapshots.sqlite` and `ids-ingestion.sqlite`, then copies all snapshot source, vector, and comparison-alert files referenced by the snapshot database. A manifest records each original relative path and its backup copy. Configure `ENTEC_BACKUP_DIR) outside `ENTEC_SNAPSHOT_DIR`.
+The authenticated `POST /api/maintenance/backup` endpoint uses SQLite's online backup API for both `snapshots.sqlite` and `ids-ingestion.sqlite`, then copies all snapshot source, vector, and comparison-alert files referenced by the snapshot database. A manifest records each original relative path and its backup copy. Configure `ENTEC_BACKUP_DIR` outside `ENTEC_SNAPSHOT_DIR`.
 
 Every non-dry-run `POST /api/maintenance/retention` performs the same backup first. If the backup fails, retention cleanup is not executed. Dry-run requests do not create backups. Keep the backup directory on durable storage and test restore procedures regularly.

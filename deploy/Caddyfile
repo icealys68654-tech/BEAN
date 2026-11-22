@@ -17,11 +17,9 @@
 
 {$BEAN_API_DOMAIN} {
   encode zstd gzip
-  basic_auth {
-    {$ENTEC_PROXY_USER} {$ENTEC_PROXY_PASSWORD_HASH}
-  }
+  # TagEngine validates the caller's ENTEC_API_TOKEN bearer header itself.
+  # Do not inject a shared proxy token here: that would bypass client auth.
   reverse_proxy tagengine:3000 {
-    header_up Authorization "Bearer {$ENTEC_API_TOKEN}"
     header_up X-Forwarded-Proto {scheme}
   }
 }
