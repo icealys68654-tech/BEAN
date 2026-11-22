@@ -137,7 +137,7 @@ test("scanner evidence uploads through authenticated TagEngine HTTP API and retr
     assert.equal(listed.body.scans[0].recordCount, records.length);
 
     const malformedEvidence = path.join(dir, "malformed.jsonl");
-    fs.writeFileSync(malformedEvidence, fs.readFileSync(evidence, "utf8") + "{malformed-json\\n");
+    fs.writeFileSync(malformedEvidence, fs.readFileSync(evidence, "utf8") + "{malformed-json\n");
     const failedUpload = spawnSync(python, [
       uploader, "--jsonl", malformedEvidence,
       "--scan-id", "e2e00000-0000-4000-8000-000000000002",
