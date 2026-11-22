@@ -68,7 +68,7 @@ test("scanner evidence uploads through authenticated TagEngine HTTP API and retr
   const scanId = "e2e00000-0000-4000-8000-000000000001";
   let server;
   fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(path.join(root, "plain.txt"), "BEAN scanner integration fixture\\n");
+  fs.writeFileSync(path.join(root, "plain.txt"), "BEAN scanner integration fixture\n");
   fs.writeFileSync(path.join(root, "sample.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
 
   try {
@@ -85,7 +85,7 @@ test("scanner evidence uploads through authenticated TagEngine HTTP API and retr
     }
     assert.equal(scannerRun.status, 0, scannerRun.stderr || scannerRun.stdout);
 
-    const records = fs.readFileSync(evidence, "utf8").trim().split(/\\r?\\n/).map(JSON.parse);
+    const records = fs.readFileSync(evidence, "utf8").trim().split(/\r?\n/).map(JSON.parse);
     assert.equal(records.length, 2);
     for (const record of records) {
       assert.equal(typeof record.path, "string");
@@ -115,7 +115,7 @@ test("scanner evidence uploads through authenticated TagEngine HTTP API and retr
     server.stdout.on("data", (chunk) => { serverOutput += chunk.toString(); });
     server.stderr.on("data", (chunk) => { serverOutput += chunk.toString(); });
     await waitForServer(baseUrl, server).catch((error) => {
-      throw new Error(`${error.message}\\n${serverOutput}`);
+      throw new Error(`${error.message}\n${serverOutput}`);
     });
 
     const unauthenticated = await requestJson(`${baseUrl}/api/ids/scans`);
