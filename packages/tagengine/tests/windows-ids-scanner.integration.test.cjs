@@ -54,7 +54,7 @@ test("Python scanner JSONL is accepted and persisted by TagEngine ingestion", as
         scanId: "e2e00000-0000-4000-8000-000000000001",
         volumeId: "fixture-volume",
         label: "scanner-to-TagEngine integration",
-        lines: fs.createReadStream(evidence, { encoding: "utf8" }).pipe(require("node:readline").createInterface({ crlfDelay: Infinity }))
+        lines: require("node:readline").createInterface({ input: fs.createReadStream(evidence, { encoding: "utf8" }), crlfDelay: Infinity })
       });
       assert.equal(scan.status, "COMPLETE");
       assert.equal(scan.recordCount, 2);
