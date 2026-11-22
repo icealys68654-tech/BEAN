@@ -3,40 +3,89 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
-const Database = require("better-sqlite3");
-const { IdsIngestionStore } = require("../dist/ids-ingestion-store.js");
+const net = require("node:net");
+const http = require("node:http");
+const { spawn, spawnSync } = require("node:child_process");
 
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "bean-ids-e2e-"));
 }
 
-test("Python scanner JSONL is accepted and persisted by TagEngine ingestion", async (t) => {
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = address && typeof address === "object" ? address.port : 0;
+      server.close((error) => error ? reject(error) : resolve(port));
+    });
+  });
+}
+
+function requestJson(url, token) {
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => { body += chunk; });
+      res.on("end", () => {
+        let parsed;
+        try { parsed = JSON.parse(body); } catch { return reject(new Error(`Invalid JSON response: ${body}`)); }
+        resolve({ status: res.statusCode, body: parsed });
+      });
+    });
+    req.once("error", reject);
+    req.setTimeout(3000, () => req.destroy(new Error("HTTP request timed out")));
+  });
+}
+
+async function waitForServer(baseUrl, child) {
+  const deadline = Date.now() + 15000;
+  let lastError;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error(`TagEngine exited early (${child.exitCode})`);
+    try {
+      const response = await requestJson(`${baseUrl}/api/health`);
+      if (response.status === 200) return;
+    } catch (error) { lastError = error; }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  throw new Error(`TagEngine did not become ready: ${lastError || "timeout"}`);
+}
+
+test("scanner evidence uploads through authenticated TagEngine HTTP API and retries idempotently", async (t) => {
   const dir = tempDir();
   const root = path.join(dir, "fixture");
   const evidence = path.join(dir, "evidence.jsonl");
   const baseline = path.join(dir, "baseline.sqlite");
   const findings = path.join(dir, "findings.jsonl");
-  const storeDir = path.join(dir, "tagengine");
+  const dataDir = path.join(dir, "tagengine-data");
+  const backupDir = path.join(dir, "backups");
+  const token = "test-only-bean-ids-token";
+  const scanId = "e2e00000-0000-4000-8000-000000000001";
+  let server;
   fs.mkdirSync(root, { recursive: true });
-  fs.writeFileSync(path.join(root, "plain.txt"), "BEAN scanner integration fixture\n");
+  fs.writeFileSync(path.join(root, "plain.txt"), "BEAN scanner integration fixture\\n");
   fs.writeFileSync(path.join(root, "sample.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]));
 
   try {
     const scanner = path.resolve(__dirname, "../../../ops/windows/ids/scanner.py");
+    const uploader = path.resolve(__dirname, "../../../ops/windows/ids_ingest.py");
     const python = process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
-    const run = spawnSync(python, [
+    const scannerRun = spawnSync(python, [
       scanner, "scan", "--root", root, "--output", evidence,
-      "--baseline", baseline, "--findings", findings,
-      "--scan-id", "e2e00000-0000-4000-8000-000000000001"
+      "--baseline", baseline, "--findings", findings, "--scan-id", scanId
     ], { encoding: "utf8" });
-
-    if (run.error && run.error.code === "ENOENT") {
+    if (scannerRun.error && scannerRun.error.code === "ENOENT") {
       t.skip(`Python interpreter '${python}' is not installed`);
       return;
     }
-    assert.equal(run.status, 0, run.stderr || run.stdout);
-    const records = fs.readFileSync(evidence, "utf8").trim().split(/\r?\n/).map(JSON.parse);
+    assert.equal(scannerRun.status, 0, scannerRun.stderr || scannerRun.stdout);
+
+    const records = fs.readFileSync(evidence, "utf8").trim().split(/\\r?\\n/).map(JSON.parse);
     assert.equal(records.length, 2);
     for (const record of records) {
       assert.equal(typeof record.path, "string");
@@ -48,29 +97,60 @@ test("Python scanner JSONL is accepted and persisted by TagEngine ingestion", as
       assert.equal(typeof record.magic_info, "string");
     }
 
-    const store = new IdsIngestionStore(storeDir);
-    try {
-      const scan = await store.ingest({
-        scanId: "e2e00000-0000-4000-8000-000000000001",
-        volumeId: "fixture-volume",
-        label: "scanner-to-TagEngine integration",
-        lines: require("node:readline").createInterface({ input: fs.createReadStream(evidence, { encoding: "utf8" }), crlfDelay: Infinity })
-      });
-      assert.equal(scan.status, "COMPLETE");
-      assert.equal(scan.recordCount, 2);
-      const db = new Database(path.join(storeDir, "ids-ingestion.sqlite"), { readonly: true });
-      try {
-        assert.equal(db.prepare("SELECT COUNT(*) AS n FROM ids_events WHERE scan_id = ?")
-          .get(scan.scanId).n, 2);
-        assert.equal(db.prepare("SELECT COUNT(*) AS n FROM ids_scans WHERE scan_id = ? AND status = 'COMPLETE'")
-          .get(scan.scanId).n, 1);
-      } finally {
-        db.close();
-      }
-    } finally {
-      store.close();
-    }
+    const port = await freePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    server = spawn(process.execPath, [path.resolve(__dirname, "../dist/server.js")], {
+      cwd: path.resolve(__dirname, ".."),
+      env: {
+        ...process.env,
+        NODE_ENV: "production",
+        ENTEC_API_TOKEN: token,
+        ENTEC_SNAPSHOT_DIR: dataDir,
+        ENTEC_BACKUP_DIR: backupDir,
+        PORT: String(port)
+      },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let serverOutput = "";
+    server.stdout.on("data", (chunk) => { serverOutput += chunk.toString(); });
+    server.stderr.on("data", (chunk) => { serverOutput += chunk.toString(); });
+    await waitForServer(baseUrl, server).catch((error) => {
+      throw new Error(`${error.message}\\n${serverOutput}`);
+    });
+
+    const unauthenticated = await requestJson(`${baseUrl}/api/ids/scans`);
+    assert.equal(unauthenticated.status, 401);
+
+    const uploadEnv = { ...process.env, ENTEC_API_TOKEN: token, TAGENGINE_URL: baseUrl };
+    const uploadArgs = [
+      uploader, "--jsonl", evidence, "--scan-id", scanId,
+      "--volume-id", "fixture-volume", "--label", "scanner HTTP integration"
+    ];
+    const firstUpload = spawnSync(python, uploadArgs, { encoding: "utf8", env: uploadEnv, timeout: 30000 });
+    assert.equal(firstUpload.status, 0, firstUpload.stderr || firstUpload.stdout);
+
+    const listed = await requestJson(`${baseUrl}/api/ids/scans?limit=10`, token);
+    assert.equal(listed.status, 200);
+    assert.equal(listed.body.scans.length, 1);
+    assert.equal(listed.body.scans[0].scanId, scanId);
+    assert.equal(listed.body.scans[0].status, "COMPLETE");
+    assert.equal(listed.body.scans[0].recordCount, records.length);
+
+    const retryUpload = spawnSync(python, uploadArgs, { encoding: "utf8", env: uploadEnv, timeout: 30000 });
+    assert.equal(retryUpload.status, 0, retryUpload.stderr || retryUpload.stdout);
+    const afterRetry = await requestJson(`${baseUrl}/api/ids/scans?limit=10`, token);
+    assert.equal(afterRetry.status, 200);
+    assert.equal(afterRetry.body.scans.length, 1);
+    assert.equal(afterRetry.body.scans[0].recordCount, records.length);
   } finally {
+    if (server && server.exitCode === null) {
+      server.kill("SIGTERM");
+      await new Promise((resolve) => {
+        const timeout = setTimeout(resolve, 3000);
+        server.once("exit", () => { clearTimeout(timeout); resolve(); });
+      });
+      if (server.exitCode === null) server.kill("SIGKILL");
+    }
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
