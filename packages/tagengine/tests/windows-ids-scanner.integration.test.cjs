@@ -136,6 +136,19 @@ test("scanner evidence uploads through authenticated TagEngine HTTP API and retr
     assert.equal(listed.body.scans[0].status, "COMPLETE");
     assert.equal(listed.body.scans[0].recordCount, records.length);
 
+    const malformedEvidence = path.join(dir, "malformed.jsonl");
+    fs.writeFileSync(malformedEvidence, fs.readFileSync(evidence, "utf8") + "{malformed-json\\n");
+    const failedUpload = spawnSync(python, [
+      uploader, "--jsonl", malformedEvidence,
+      "--scan-id", "e2e00000-0000-4000-8000-000000000002",
+      "--volume-id", "fixture-volume"
+    ], { encoding: "utf8", env: uploadEnv, timeout: 30000 });
+    assert.notEqual(failedUpload.status, 0, failedUpload.stdout);
+
+    const afterFailure = await requestJson(`${baseUrl}/api/ids/scans?limit=10`, token);
+    assert.equal(afterFailure.status, 200);
+    assert.equal(afterFailure.body.scans.length, 1, "failed ingestion must not leave a partial scan");
+
     const retryUpload = spawnSync(python, uploadArgs, { encoding: "utf8", env: uploadEnv, timeout: 30000 });
     assert.equal(retryUpload.status, 0, retryUpload.stderr || retryUpload.stdout);
     const afterRetry = await requestJson(`${baseUrl}/api/ids/scans?limit=10`, token);
