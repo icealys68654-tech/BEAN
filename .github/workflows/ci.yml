@@ -28,3 +28,31 @@ jobs:
           mkdir -p dist/bin
           cd packages/env-guard && go build -o ../../dist/bin/env-guard ./cmd/env-guard
           cd ../smoke-probe && go build -o ../../dist/bin/smoke-probe ./cmd/smoke-probe
+
+  windows-preflight:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows deployment scripts
+        shell: pwsh
+        run: |
+          $scripts = @(
+            "ops/windows/Test-BeanDeployment.ps1",
+            "ops/windows/Start-Bean.ps1",
+            "ops/windows/Backup-TagEngine.ps1",
+            "ops/windows/Register-BeanTasks.ps1"
+          )
+          foreach ($scriptPath in $scripts) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD $scriptPath),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error ("{0}: {1}" -f $scriptPath, $_.Message) }
+              throw ("PowerShell parse failed: {0}" -f $scriptPath)
+            }
+            Write-Host ("PowerShell syntax OK: {0}" -f $scriptPath)
+          }
